@@ -28,6 +28,14 @@ void imprimirEstado(const Dispositivo *d);
 void demoUseAfterFree(Dispositivo *disp);
 void propagarCompromiso(Dispositivo *disp);
 void capacidadesDelAtacante(const Dispositivo *disp);
+int validarActivationLockModelo(
+    const char *ecid_registrado,
+    const char *apple_id_propietario,
+    int activation_lock_activo,
+    const char *ecid_solicitud,
+    const char *apple_id_presentado,
+    int ticket_firmado_por_apple
+);
 void demoActivationLockRemoto(const Dispositivo *disp);
 void demoVulnerabilidadesActivationLock(const Dispositivo *disp);
 void demoCorregida(void);
