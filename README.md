@@ -1,5 +1,9 @@
 # iOS Security Memory Safety Demo
 
+![Build](https://github.com/DavidEgeaCalatayud/ios-security-memory-safety-demo/actions/workflows/build.yml/badge.svg)
+![Language](https://img.shields.io/badge/language-C-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
+
 Demostracion academica escrita en C sobre conceptos de seguridad relacionados con la cadena de arranque de iOS, la vulnerabilidad checkm8, el modelo de confianza BootROM -> iBoot -> Kernel y los limites entre jailbreak, Secure Enclave y Activation Lock.
 
 Este proyecto es exclusivamente educativo. No reproduce checkm8, no interactua con dispositivos Apple reales, no implementa un bypass de Activation Lock y no contiene codigo operativo de explotacion contra iOS.
@@ -69,6 +73,7 @@ Estos conceptos son adecuados para explicar vulnerabilidades en componentes de b
 ├── .github/
 │   └── workflows/
 │       └── build.yml
+├── .gitignore
 ├── Makefile
 ├── LICENSE
 └── README.md
@@ -83,7 +88,7 @@ Estos conceptos son adecuados para explicar vulnerabilidades en componentes de b
 | `src/uaf_demo.c` | Demostracion use-after-free, version corregida y ruta ASan |
 | `src/bootchain_model.c` | Modelo BootROM -> iBoot -> Kernel y alcance del compromiso |
 | `src/activation_lock_model.c` | Modelo conceptual de Activation Lock y catalogo de vectores |
-| `tests/smoke_test.c` | Prueba minima para validar el esqueleto de tests |
+| `tests/smoke_test.c` | Test real con `assert` sobre estados, propagacion y estructura DFU |
 
 ## Makefile
 
@@ -94,6 +99,7 @@ make
 make run
 make clean
 make asan
+make test
 ```
 
 ### Compilar
@@ -119,6 +125,19 @@ Ejecuta:
 ```bash
 ./demo
 ```
+
+### Ejecutar tests
+
+```bash
+make test
+```
+
+El test compila `tests/smoke_test.c` junto con los modulos del proyecto, excepto `src/main.c`, y valida con `assert` que:
+
+- el estado inicial del dispositivo es coherente;
+- el compromiso de BootROM propaga correctamente hacia iBoot y Kernel;
+- Secure Enclave y Activation Lock permanecen intactos;
+- la estructura `DFURequest` mantiene los valores esperados.
 
 ### Limpiar binarios generados
 
