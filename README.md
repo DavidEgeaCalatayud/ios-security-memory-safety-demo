@@ -17,7 +17,7 @@ Uso previsto:
 - explicar errores de memoria de tipo use-after-free;
 - mostrar por que una vulnerabilidad temprana en la cadena de arranque es grave;
 - diferenciar compromiso local, Secure Enclave y Activation Lock;
-- practicar compilacion, sanitizers y organizacion modular de un proyecto en C.
+- practicar compilacion, sanitizers, tests y organizacion modular de un proyecto en C.
 
 Uso no previsto:
 
@@ -39,7 +39,7 @@ BootROM -> iBoot -> Kernel -> Userland
     \-> Secure Enclave separado
 ```
 
-La BootROM actua como raiz de confianza. Si se compromete esta primera etapa, se rompe la confianza sobre las etapas posteriores, ya que el atacante puede alterar que componente se carga despues. Ademas, al estar la BootROM grabada en ROM dentro del SoC, un fallo en esa zona no puede corregirse completamente mediante una simple actualizacion de software en dispositivos ya fabricados.
+La BootROM actua como raiz de confianza. Si se compromete esta primera etapa, se rompe la confianza sobre las etapas posteriores, ya que el atacante puede alterar que componente se carga despues. Al estar la BootROM grabada en ROM dentro del SoC, un fallo en esa zona no puede corregirse completamente mediante una simple actualizacion de software en dispositivos ya fabricados.
 
 ## Lenguaje utilizado
 
@@ -55,8 +55,6 @@ Se ha elegido C porque permite representar de forma directa conceptos de bajo ni
 - errores de tipo use-after-free;
 - deteccion de errores mediante AddressSanitizer.
 
-Estos conceptos son adecuados para explicar vulnerabilidades en componentes de bajo nivel, como bootloaders, parsers USB, drivers o codigo de arranque.
-
 ## Estructura del proyecto
 
 ```text
@@ -69,7 +67,7 @@ Estos conceptos son adecuados para explicar vulnerabilidades en componentes de b
 │   ├── bootchain_model.c
 │   └── activation_lock_model.c
 ├── tests/
-│   └── smoke_test.c
+│   └── unit_tests.c
 ├── .github/
 │   └── workflows/
 │       └── build.yml
@@ -87,19 +85,19 @@ Estos conceptos son adecuados para explicar vulnerabilidades en componentes de b
 | `src/main.c` | Punto de entrada y orquestacion de la demo |
 | `src/uaf_demo.c` | Demostracion use-after-free, version corregida y ruta ASan |
 | `src/bootchain_model.c` | Modelo BootROM -> iBoot -> Kernel y alcance del compromiso |
-| `src/activation_lock_model.c` | Modelo conceptual de Activation Lock y catalogo de vectores |
-| `tests/smoke_test.c` | Test real con `assert` sobre estados, propagacion y estructura DFU |
+| `src/activation_lock_model.c` | Modelo conceptual y funcion testeable de Activation Lock |
+| `tests/unit_tests.c` | Tests reales con `assert` sobre boot chain, DFURequest y Activation Lock |
 
 ## Makefile
 
-El proyecto incluye un `Makefile` con los objetivos principales:
+El proyecto incluye estos objetivos:
 
 ```bash
 make
 make run
-make clean
-make asan
 make test
+make asan
+make clean
 ```
 
 ### Compilar
@@ -120,32 +118,23 @@ gcc -std=c99 -O0 -Wall -Wextra -Iinclude src/main.c src/uaf_demo.c src/bootchain
 make run
 ```
 
-Ejecuta:
-
-```bash
-./demo
-```
-
-### Ejecutar tests
+### Ejecutar unit tests
 
 ```bash
 make test
 ```
 
-El test compila `tests/smoke_test.c` junto con los modulos del proyecto, excepto `src/main.c`, y valida con `assert` que:
+El test compila `tests/unit_tests.c` junto con los modulos del proyecto, excepto `src/main.c`, y valida con `assert` que:
 
 - el estado inicial del dispositivo es coherente;
 - el compromiso de BootROM propaga correctamente hacia iBoot y Kernel;
-- Secure Enclave y Activation Lock permanecen intactos;
-- la estructura `DFURequest` mantiene los valores esperados.
-
-### Limpiar binarios generados
-
-```bash
-make clean
-```
-
-Elimina los binarios generados por la compilacion normal, AddressSanitizer y pruebas.
+- Secure Enclave y Activation Lock permanecen intactos tras el compromiso local;
+- la estructura `DFURequest` mantiene los valores esperados;
+- Activation Lock rechaza a un atacante sin ticket valido;
+- Activation Lock acepta al propietario con Apple ID correcto y ticket valido;
+- Activation Lock rechaza un ECID incorrecto;
+- Activation Lock exige un ticket firmado cuando el bloqueo esta activo;
+- Activation Lock permite activacion cuando el bloqueo no esta activo.
 
 ### Ejecutar con AddressSanitizer
 
@@ -153,19 +142,28 @@ Elimina los binarios generados por la compilacion normal, AddressSanitizer y pru
 make asan
 ```
 
-El objetivo `asan` compila usando:
+El objetivo `asan` compila usando AddressSanitizer y ejecuta una ruta educativa especifica:
 
 ```bash
 gcc -std=c99 -O0 -Wall -Wextra -fsanitize=address -Iinclude src/main.c src/uaf_demo.c src/bootchain_model.c src/activation_lock_model.c -o demo_asan
-```
-
-Despues ejecuta una ruta educativa especifica:
-
-```bash
 ./demo_asan --asan-trigger
 ```
 
-Esta ruta provoca un acceso use-after-free minimo para que AddressSanitizer lo detecte de forma clara. El objetivo esta preparado para que el workflow pueda continuar aunque ASan reporte el error esperado.
+A diferencia de una ejecucion meramente informativa, `make asan` ahora verifica que ASan detecta realmente el bug esperado. Para ello:
+
+1. ejecuta la ruta `--asan-trigger`;
+2. guarda la salida en `asan_output.log`;
+3. busca el patron `ERROR: AddressSanitizer: heap-use-after-free`;
+4. devuelve exito solo si ese patron aparece;
+5. falla si ASan no detecta el use-after-free esperado.
+
+### Limpiar binarios generados
+
+```bash
+make clean
+```
+
+Elimina los binarios generados por la compilacion normal, AddressSanitizer, tests y el log temporal de ASan.
 
 ## Sample output
 
@@ -239,8 +237,6 @@ Por ese motivo, el codigo no implementa ningun bypass real de Activation Lock. S
 
 ## Catalogo de vulnerabilidades analizadas
 
-La demo incluye un pequeno catalogo conceptual de vectores relacionados con Activation Lock:
-
 | Vector | Capa atacada | Impacto conceptual |
 | --- | --- | --- |
 | Parche local de interfaz | Sistema local | Puede ocultar una pantalla, pero no elimina el vinculo remoto |
@@ -288,7 +284,7 @@ make asan
 make clean
 ```
 
-Esto permite comprobar automaticamente que el proyecto compila y que la ruta educativa de AddressSanitizer sigue funcionando.
+Esto permite comprobar automaticamente que el proyecto compila, que los unit tests pasan y que la ruta educativa de AddressSanitizer detecta el use-after-free esperado.
 
 ## Limitaciones
 
