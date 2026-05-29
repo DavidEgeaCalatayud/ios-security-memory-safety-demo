@@ -3,6 +3,7 @@ CFLAGS ?= -std=c99 -O0 -Wall -Wextra -Iinclude
 ASAN_FLAGS ?= -std=c99 -O0 -Wall -Wextra -fsanitize=address -Iinclude
 
 SRC := src/main.c src/uaf_demo.c src/bootchain_model.c src/activation_lock_model.c
+LIB_SRC := src/uaf_demo.c src/bootchain_model.c src/activation_lock_model.c
 TARGET := demo
 ASAN_TARGET := demo_asan
 TEST_TARGET := smoke_test
@@ -23,7 +24,7 @@ asan:
 	ASAN_OPTIONS=halt_on_error=0:abort_on_error=0 ./$(ASAN_TARGET) --asan-trigger || true
 
 test:
-	$(CC) $(CFLAGS) tests/smoke_test.c -o $(TEST_TARGET)
+	$(CC) $(CFLAGS) tests/smoke_test.c $(LIB_SRC) -o $(TEST_TARGET)
 	./$(TEST_TARGET)
 
 clean:
