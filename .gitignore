@@ -1,0 +1,43 @@
+# Build outputs
+/demo
+/demo.exe
+/demo_asan
+/demo_asan.exe
+/smoke_test
+/smoke_test.exe
+*.o
+*.obj
+*.out
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+
+# Sanitizer and profiling artifacts
+asan.log*
+*.profraw
+*.profdata
+
+# Coverage artifacts
+*.gcda
+*.gcno
+*.gcov
+coverage/
+
+# Editor and IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+/tmp/
+*.tmp
+*.log
