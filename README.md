@@ -1,56 +1,181 @@
-# iCloud Phone Block - Demo academica sobre checkm8
+# iOS Security Memory Safety Demo
 
-Este repositorio contiene una demostracion academica escrita en C sobre conceptos de seguridad relacionados con la cadena de arranque de iOS, la vulnerabilidad checkm8 y los limites entre jailbreak, Secure Enclave y Activation Lock.
+Demostracion academica escrita en C sobre conceptos de seguridad relacionados con la cadena de arranque de iOS, la vulnerabilidad checkm8, el modelo de confianza BootROM -> iBoot -> Kernel y los limites entre jailbreak, Secure Enclave y Activation Lock.
 
-El objetivo del proyecto no es reproducir checkm8 ni construir una herramienta funcional contra dispositivos Apple. El codigo es una simulacion didactica pensada para explicar, de forma controlada, como un fallo de memoria puede comprometer una capa temprana del sistema y por que ese compromiso no implica automaticamente romper todos los mecanismos de seguridad del dispositivo.
+Este proyecto es exclusivamente educativo. No reproduce checkm8, no interactua con dispositivos Apple reales, no implementa un bypass de Activation Lock y no contiene codigo operativo de explotacion contra iOS.
+
+## Responsible security research / educational only
+
+Este repositorio debe entenderse como una practica academica de seguridad defensiva y analisis conceptual.
+
+Uso previsto:
+
+- explicar errores de memoria de tipo use-after-free;
+- mostrar por que una vulnerabilidad temprana en la cadena de arranque es grave;
+- diferenciar compromiso local, Secure Enclave y Activation Lock;
+- practicar compilacion, sanitizers y organizacion modular de un proyecto en C.
+
+Uso no previsto:
+
+- atacar dispositivos reales;
+- evadir Activation Lock;
+- acceder a datos de terceros;
+- construir herramientas de jailbreak operativas;
+- saltarse mecanismos antirrobo o de autenticacion.
 
 ## Contexto
 
-checkm8 es el nombre de una vulnerabilidad asociada a determinados SoCs de Apple, desde A5 hasta A11, relacionada con la BootROM/SecureROM. Su importancia se debe a que afecta a una etapa muy temprana de la cadena de arranque.
+checkm8 es el nombre de una vulnerabilidad asociada a determinados SoCs de Apple, desde A5 hasta A11, relacionada con la BootROM/SecureROM. Su relevancia tecnica se debe a que afecta a una etapa muy temprana de la cadena de arranque.
 
-En terminos conceptuales, la cadena de arranque segura de iOS puede representarse asi:
+En un modelo simplificado, la cadena de arranque segura puede representarse asi:
 
 ```text
-BootROM / SecureROM
-        -> iBoot
-        -> Kernel de iOS
-        -> Sistema operativo
+BootROM -> iBoot -> Kernel -> Userland
+   \
+    \-> Secure Enclave separado
 ```
 
-La BootROM actua como raiz de confianza. Si se compromete esta primera etapa, se rompe la confianza sobre las etapas posteriores, ya que el atacante puede alterar que se carga despues. Ademas, al estar la BootROM grabada en ROM dentro del SoC, un fallo en esa zona no puede corregirse completamente mediante una simple actualizacion de software en dispositivos ya fabricados.
+La BootROM actua como raiz de confianza. Si se compromete esta primera etapa, se rompe la confianza sobre las etapas posteriores, ya que el atacante puede alterar que componente se carga despues. Ademas, al estar la BootROM grabada en ROM dentro del SoC, un fallo en esa zona no puede corregirse completamente mediante una simple actualizacion de software en dispositivos ya fabricados.
 
 ## Lenguaje utilizado
 
 El proyecto esta desarrollado en lenguaje C.
 
-Se ha elegido C porque permite representar de forma clara conceptos de bajo nivel como:
+Se ha elegido C porque permite representar de forma directa conceptos de bajo nivel como:
 
 - reserva y liberacion manual de memoria con `malloc` y `free`;
 - punteros colgantes;
 - estructuras en memoria;
 - punteros a funcion;
 - secuestro conceptual del flujo de ejecucion;
-- errores de tipo use-after-free.
+- errores de tipo use-after-free;
+- deteccion de errores mediante AddressSanitizer.
 
 Estos conceptos son adecuados para explicar vulnerabilidades en componentes de bajo nivel, como bootloaders, parsers USB, drivers o codigo de arranque.
 
-## Archivo principal
-
-El archivo principal del proyecto es:
+## Estructura del proyecto
 
 ```text
-demo_checkm8_academico.c
+.
+├── include/
+│   └── demo.h
+├── src/
+│   ├── main.c
+│   ├── uaf_demo.c
+│   ├── bootchain_model.c
+│   └── activation_lock_model.c
+├── tests/
+│   └── smoke_test.c
+├── .github/
+│   └── workflows/
+│       └── build.yml
+├── Makefile
+├── LICENSE
+└── README.md
 ```
 
-Este archivo incluye varias demostraciones:
+### Modulos principales
 
-1. Un ejemplo de use-after-free con puntero a funcion.
-2. Una simulacion de heap grooming.
-3. Un modelo conceptual de propagacion BootROM -> iBoot -> Kernel.
-4. Una explicacion del limite entre compromiso local y Secure Enclave.
-5. Una simulacion de Activation Lock como validacion remota.
-6. Un catalogo de vectores relacionados con Activation Lock.
-7. Una version corregida del use-after-free.
+| Archivo | Responsabilidad |
+| --- | --- |
+| `include/demo.h` | Tipos compartidos y prototipos publicos del proyecto |
+| `src/main.c` | Punto de entrada y orquestacion de la demo |
+| `src/uaf_demo.c` | Demostracion use-after-free, version corregida y ruta ASan |
+| `src/bootchain_model.c` | Modelo BootROM -> iBoot -> Kernel y alcance del compromiso |
+| `src/activation_lock_model.c` | Modelo conceptual de Activation Lock y catalogo de vectores |
+| `tests/smoke_test.c` | Prueba minima para validar el esqueleto de tests |
+
+## Makefile
+
+El proyecto incluye un `Makefile` con los objetivos principales:
+
+```bash
+make
+make run
+make clean
+make asan
+```
+
+### Compilar
+
+```bash
+make
+```
+
+Equivale a compilar el proyecto modular usando `gcc`:
+
+```bash
+gcc -std=c99 -O0 -Wall -Wextra -Iinclude src/main.c src/uaf_demo.c src/bootchain_model.c src/activation_lock_model.c -o demo
+```
+
+### Ejecutar
+
+```bash
+make run
+```
+
+Ejecuta:
+
+```bash
+./demo
+```
+
+### Limpiar binarios generados
+
+```bash
+make clean
+```
+
+Elimina los binarios generados por la compilacion normal, AddressSanitizer y pruebas.
+
+### Ejecutar con AddressSanitizer
+
+```bash
+make asan
+```
+
+El objetivo `asan` compila usando:
+
+```bash
+gcc -std=c99 -O0 -Wall -Wextra -fsanitize=address -Iinclude src/main.c src/uaf_demo.c src/bootchain_model.c src/activation_lock_model.c -o demo_asan
+```
+
+Despues ejecuta una ruta educativa especifica:
+
+```bash
+./demo_asan --asan-trigger
+```
+
+Esta ruta provoca un acceso use-after-free minimo para que AddressSanitizer lo detecte de forma clara. El objetivo esta preparado para que el workflow pueda continuar aunque ASan reporte el error esperado.
+
+## Sample output
+
+La ejecucion normal muestra una salida similar a esta:
+
+```text
+Estado inicial del dispositivo:
+  BootROM .............. INTACTO
+  iBoot ................ INTACTO
+  Kernel iOS ........... INTACTO
+  Secure Enclave (SEP) . INTACTO
+  Activation Lock ...... INTACTO
+
+=== [1] DEMO: use-after-free con puntero a funcion ===
+Peticion legitima creada en direccion: 0x55f...
+  [LEGITIMO] Procesando comando: DFU_UPLOAD
+Memoria liberada, pero el puntero antiguo sigue existiendo: 0x55f...
+Heap grooming simulado: bloque reutilizado en spray[0] (0x55f...)
+El programa vuelve a usar el puntero antiguo:
+  [SECUESTRADO] Flujo desviado. Mensaje: datos_controlados
+
+=== [2] PROPAGACION POR LA CADENA DE ARRANQUE ===
+BootROM comprometida -> se puede cargar iBoot modificado.
+iBoot comprometido   -> se puede cargar kernel modificado.
+Secure Enclave: dominio independiente -> permanece INTACTO.
+Activation Lock: verificacion remota -> permanece INTACTO.
+```
+
+La direccion de memoria y el indice `spray[n]` pueden variar entre ejecuciones.
 
 ## Que demuestra el codigo
 
@@ -60,7 +185,7 @@ En el ejemplo, una estructura `DFURequest` contiene un puntero a funcion llamado
 
 Esto representa de forma didactica como una vulnerabilidad de memoria puede afectar al flujo de ejecucion. No representa el funcionamiento real de checkm8, sino una abstraccion segura del tipo de problema.
 
-## Relacion con checkm8
+## Relacion conceptual con checkm8
 
 La relacion con checkm8 es conceptual:
 
@@ -73,7 +198,7 @@ La relacion con checkm8 es conceptual:
 
 ## Secure Enclave
 
-El codigo tambien modela el Secure Enclave como un dominio separado.
+El codigo modela el Secure Enclave como un dominio separado.
 
 La idea central es que comprometer el procesador principal no implica obtener automaticamente el control del Secure Enclave. En dispositivos reales, el Secure Enclave tiene su propia cadena de arranque, memoria y sistema interno.
 
@@ -107,35 +232,44 @@ La demo incluye un pequeno catalogo conceptual de vectores relacionados con Acti
 | Fallo logico en servidor | Infraestructura remota | Seria critico, pero no seria un fallo local del dispositivo |
 | Ingenieria social | Usuario propietario | Ataque humano, no vulnerabilidad tecnica de BootROM |
 
-## Compilacion
+## Por que el comportamiento del heap puede variar
 
-Para compilar el programa:
+El resultado de una demostracion use-after-free basada en reutilizacion de memoria no siempre es identico en todos los entornos.
 
-```bash
-gcc -std=c99 -O0 -Wall -Wextra demo_checkm8_academico.c -o demo_checkm8_academico
+Algunos factores que influyen:
+
+- el allocator utilizado por la libc, por ejemplo glibc `malloc`, jemalloc, tcmalloc o el heap de Windows;
+- caches internas del allocator, como `tcache` en glibc;
+- arquitectura del procesador y alineacion de memoria;
+- nivel de optimizacion del compilador;
+- flags de seguridad y depuracion;
+- AddressSanitizer u otros instrumentadores;
+- estado previo del heap antes de la asignacion;
+- tamano exacto de la estructura y clase de tamaño usada por el allocator.
+
+En muchas implementaciones modernas, un bloque liberado puede reutilizarse rapidamente si se solicita otra reserva del mismo tamaño. Sin embargo, eso no es una garantia portable del lenguaje C. Es un comportamiento dependiente de la implementacion, por eso la demo imprime la direccion del bloque original y la direccion del bloque reutilizado.
+
+La version con AddressSanitizer es mas apropiada para demostrar el error de memoria de forma diagnostica, porque ASan instrumenta las asignaciones y marca regiones liberadas como invalidas. Por eso puede detectar explicitamente el acceso despues de `free`.
+
+## GitHub Actions
+
+El repositorio incluye un workflow en:
+
+```text
+.github/workflows/build.yml
 ```
 
-La opcion `-O0` evita optimizaciones agresivas del compilador y ayuda a que la demo sea mas predecible.
-
-## Ejecucion
-
-En Linux o macOS:
+El workflow ejecuta:
 
 ```bash
-./demo_checkm8_academico
+make
+make run
+make test
+make asan
+make clean
 ```
 
-En Windows con MinGW:
-
-```bash
-demo_checkm8_academico.exe
-```
-
-## Advertencia sobre los warnings
-
-Es normal que el compilador pueda mostrar advertencias relacionadas con use-after-free. En este proyecto esas advertencias son esperadas, porque una parte de la demo esta disenada precisamente para representar ese error.
-
-La version corregida incluida al final del programa muestra una mitigacion basica: invalidar el puntero despues de liberar la memoria y comprobarlo antes de volver a usarlo.
+Esto permite comprobar automaticamente que el proyecto compila y que la ruta educativa de AddressSanitizer sigue funcionando.
 
 ## Limitaciones
 
@@ -151,6 +285,10 @@ Este proyecto tiene las siguientes limitaciones intencionadas:
 - no modifica ningun sistema operativo.
 
 La finalidad es exclusivamente academica y conceptual.
+
+## Licencia
+
+Este proyecto se distribuye bajo licencia MIT. Consulta el archivo `LICENSE` para mas informacion.
 
 ## Conclusiones
 
