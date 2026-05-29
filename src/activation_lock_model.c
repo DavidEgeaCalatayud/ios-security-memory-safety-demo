@@ -23,6 +23,51 @@ typedef struct {
     int compromete_activation_lock;
 } AnalisisVector;
 
+static int servidorAppleValidaActivacionSilencioso(
+    const RegistroServidorApple *registro,
+    const SolicitudActivacion *solicitud
+) {
+    if (strcmp(registro->ecid, solicitud->ecid) != 0) {
+        return 0;
+    }
+
+    if (!registro->activation_lock_activo) {
+        return 1;
+    }
+
+    return strcmp(registro->apple_id_propietario, solicitud->apple_id_presentado) == 0
+        && solicitud->ticket_firmado_por_apple;
+}
+
+int validarActivationLockModelo(
+    const char *ecid_registrado,
+    const char *apple_id_propietario,
+    int activation_lock_activo,
+    const char *ecid_solicitud,
+    const char *apple_id_presentado,
+    int ticket_firmado_por_apple
+) {
+    RegistroServidorApple registro;
+    SolicitudActivacion solicitud;
+
+    memset(&registro, 0, sizeof(registro));
+    memset(&solicitud, 0, sizeof(solicitud));
+
+    strncpy(registro.ecid, ecid_registrado, sizeof(registro.ecid) - 1);
+    strncpy(registro.apple_id_propietario,
+            apple_id_propietario,
+            sizeof(registro.apple_id_propietario) - 1);
+    registro.activation_lock_activo = activation_lock_activo;
+
+    strncpy(solicitud.ecid, ecid_solicitud, sizeof(solicitud.ecid) - 1);
+    strncpy(solicitud.apple_id_presentado,
+            apple_id_presentado,
+            sizeof(solicitud.apple_id_presentado) - 1);
+    solicitud.ticket_firmado_por_apple = ticket_firmado_por_apple;
+
+    return servidorAppleValidaActivacionSilencioso(&registro, &solicitud);
+}
+
 static int servidorAppleValidaActivacion(
     const RegistroServidorApple *registro,
     const SolicitudActivacion *solicitud
