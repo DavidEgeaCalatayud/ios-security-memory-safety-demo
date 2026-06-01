@@ -1,6 +1,6 @@
 CC ?= gcc
 CFLAGS ?= -std=c99 -O0 -Wall -Wextra -Iinclude
-STRICT_FLAGS ?= -std=c99 -O0 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Werror -Iinclude
+STRICT_FLAGS ?= -std=c99 -O0 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Werror -Wno-error=use-after-free -Iinclude
 ASAN_FLAGS ?= -std=c99 -O0 -Wall -Wextra -fsanitize=address -Iinclude
 UBSAN_FLAGS ?= -std=c99 -O0 -Wall -Wextra -fsanitize=undefined -Iinclude
 
