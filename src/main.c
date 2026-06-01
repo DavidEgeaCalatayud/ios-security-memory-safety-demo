@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
     imprimirEstado(&disp);
 
     demoUseAfterFree(&disp);
-    propagarCompromiso(&disp);
+    demoPropagacionCompromiso(&disp);
 
     printf("\nEstado final del dispositivo:\n");
     imprimirEstado(&disp);
