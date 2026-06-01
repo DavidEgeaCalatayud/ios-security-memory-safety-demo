@@ -2,6 +2,8 @@
 #define IOS_SECURITY_MEMORY_SAFETY_DEMO_H
 
 #define MAX_SPRAY 64
+#define ACTIVATION_ECID_SIZE 32
+#define ACTIVATION_APPLE_ID_SIZE 64
 
 typedef void (*DFUHandler)(const char *msg);
 
@@ -16,6 +18,23 @@ typedef enum {
     COMPROMETIDO
 } Estado;
 
+typedef enum {
+    ACTIVATION_DENIED = 0,
+    ACTIVATION_ALLOWED = 1
+} ActivationResult;
+
+typedef struct {
+    char ecid[ACTIVATION_ECID_SIZE];
+    char apple_id_propietario[ACTIVATION_APPLE_ID_SIZE];
+    int  activation_lock_activo;
+} ActivationRecord;
+
+typedef struct {
+    char ecid[ACTIVATION_ECID_SIZE];
+    char apple_id_presentado[ACTIVATION_APPLE_ID_SIZE];
+    int  ticket_firmado_por_apple;
+} ActivationRequest;
+
 typedef struct {
     Estado bootrom;
     Estado iboot;
@@ -28,13 +47,9 @@ void imprimirEstado(const Dispositivo *d);
 void demoUseAfterFree(Dispositivo *disp);
 void propagarCompromiso(Dispositivo *disp);
 void capacidadesDelAtacante(const Dispositivo *disp);
-int validarActivationLockModelo(
-    const char *ecid_registrado,
-    const char *apple_id_propietario,
-    int activation_lock_activo,
-    const char *ecid_solicitud,
-    const char *apple_id_presentado,
-    int ticket_firmado_por_apple
+ActivationResult validarActivationLockModelo(
+    const ActivationRecord *record,
+    const ActivationRequest *request
 );
 void demoActivationLockRemoto(const Dispositivo *disp);
 void demoVulnerabilidadesActivationLock(const Dispositivo *disp);
