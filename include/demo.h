@@ -45,7 +45,8 @@ typedef struct {
 
 void imprimirEstado(const Dispositivo *d);
 void demoUseAfterFree(Dispositivo *disp);
-void propagarCompromiso(Dispositivo *disp);
+void propagarCompromisoModelo(Dispositivo *disp);
+void demoPropagacionCompromiso(Dispositivo *disp);
 void capacidadesDelAtacante(const Dispositivo *disp);
 ActivationResult validarActivationLockModelo(
     const ActivationRecord *record,
