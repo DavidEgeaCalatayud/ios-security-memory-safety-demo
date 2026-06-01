@@ -228,7 +228,7 @@ void demoVulnerabilidadesActivationLock(const Dispositivo *disp) {
         }
     };
 
-    int total = sizeof(vectores) / sizeof(vectores[0]);
+    size_t total = sizeof(vectores) / sizeof(vectores[0]);
 
     printf("Estado local del dispositivo:\n");
     printf("  BootROM: %s\n", disp->bootrom == COMPROMETIDO ? "COMPROMETIDO" : "INTACTO");
@@ -237,7 +237,7 @@ void demoVulnerabilidadesActivationLock(const Dispositivo *disp) {
 
     printf("\nAnalisis de vectores posibles:\n");
 
-    for (int i = 0; i < total; i++) {
+    for (size_t i = 0; i < total; i++) {
         imprimirVector(&vectores[i]);
     }
 
