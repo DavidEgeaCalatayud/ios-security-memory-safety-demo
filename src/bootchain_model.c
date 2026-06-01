@@ -12,16 +12,31 @@ void imprimirEstado(const Dispositivo *d) {
     printf("  Activation Lock ...... %s\n", etiqueta[d->activation_lock]);
 }
 
-void propagarCompromiso(Dispositivo *disp) {
+void propagarCompromisoModelo(Dispositivo *disp) {
+    if (disp == NULL) {
+        return;
+    }
+
+    if (disp->bootrom == COMPROMETIDO) {
+        disp->iboot = COMPROMETIDO;
+        disp->kernel = COMPROMETIDO;
+    }
+}
+
+void demoPropagacionCompromiso(Dispositivo *disp) {
     printf("\n=== [2] PROPAGACION POR LA CADENA DE ARRANQUE ===\n");
+
+    if (disp == NULL) {
+        printf("Dispositivo no valido. No se puede propagar el compromiso.\n");
+        return;
+    }
 
     if (disp->bootrom == COMPROMETIDO) {
         printf("BootROM comprometida -> se puede cargar iBoot modificado.\n");
-        disp->iboot = COMPROMETIDO;
-
         printf("iBoot comprometido   -> se puede cargar kernel modificado.\n");
-        disp->kernel = COMPROMETIDO;
     }
+
+    propagarCompromisoModelo(disp);
 
     printf("Secure Enclave: dominio independiente -> permanece INTACTO.\n");
     printf("Activation Lock: verificacion remota -> permanece INTACTO.\n");
