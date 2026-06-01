@@ -81,12 +81,51 @@ Se ha elegido C porque permite representar de forma directa conceptos de bajo ni
 
 | Archivo | Responsabilidad |
 | --- | --- |
-| `include/demo.h` | Tipos compartidos y prototipos publicos del proyecto |
+| `include/demo.h` | Tipos compartidos, estructuras publicas y prototipos del proyecto |
 | `src/main.c` | Punto de entrada y orquestacion de la demo |
 | `src/uaf_demo.c` | Demostracion use-after-free, version corregida y ruta ASan |
 | `src/bootchain_model.c` | Modelo BootROM -> iBoot -> Kernel y alcance del compromiso |
 | `src/activation_lock_model.c` | Modelo conceptual y funcion testeable de Activation Lock |
 | `tests/unit_tests.c` | Tests reales con `assert` sobre boot chain, DFURequest y Activation Lock |
+
+## API de Activation Lock
+
+El modelo de Activation Lock usa estructuras publicas para representar mejor una validacion cliente-servidor.
+
+```c
+typedef enum {
+    ACTIVATION_DENIED = 0,
+    ACTIVATION_ALLOWED = 1
+} ActivationResult;
+
+typedef struct {
+    char ecid[ACTIVATION_ECID_SIZE];
+    char apple_id_propietario[ACTIVATION_APPLE_ID_SIZE];
+    int  activation_lock_activo;
+} ActivationRecord;
+
+typedef struct {
+    char ecid[ACTIVATION_ECID_SIZE];
+    char apple_id_presentado[ACTIVATION_APPLE_ID_SIZE];
+    int  ticket_firmado_por_apple;
+} ActivationRequest;
+
+ActivationResult validarActivationLockModelo(
+    const ActivationRecord *record,
+    const ActivationRequest *request
+);
+```
+
+La funcion `validarActivationLockModelo` deniega por defecto entradas no validas. En concreto, rechaza:
+
+- punteros `NULL`;
+- campos de texto vacios;
+- buffers sin terminador `\0`, que representan entradas demasiado largas o mal formadas;
+- ECID que no coincide con el registro;
+- Apple ID incorrecto;
+- ausencia de ticket valido cuando Activation Lock esta activo.
+
+Esta API evita una firma excesivamente larga con muchos parametros sueltos y hace que el codigo sea mas legible, testeable y parecido a una validacion remota real.
 
 ## Makefile
 
@@ -130,10 +169,11 @@ El test compila `tests/unit_tests.c` junto con los modulos del proyecto, excepto
 - el compromiso de BootROM propaga correctamente hacia iBoot y Kernel;
 - Secure Enclave y Activation Lock permanecen intactos tras el compromiso local;
 - la estructura `DFURequest` mantiene los valores esperados;
-- Activation Lock rechaza a un atacante sin ticket valido;
+- Activation Lock rechaza punteros `NULL`;
+- Activation Lock rechaza campos vacios;
+- Activation Lock rechaza campos demasiado largos/no terminados;
+- Activation Lock rechaza identidad incorrecta o ticket ausente;
 - Activation Lock acepta al propietario con Apple ID correcto y ticket valido;
-- Activation Lock rechaza un ECID incorrecto;
-- Activation Lock exige un ticket firmado cuando el bloqueo esta activo;
 - Activation Lock permite activacion cuando el bloqueo no esta activo.
 
 ### Ejecutar con AddressSanitizer
