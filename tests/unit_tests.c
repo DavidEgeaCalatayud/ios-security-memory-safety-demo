@@ -42,7 +42,7 @@ static void test_initial_device_state(void) {
     assert(disp.activation_lock == INTACTO);
 }
 
-static void test_boot_chain_propagation(void) {
+static void test_boot_chain_model_propagation(void) {
     Dispositivo disp = {
         COMPROMETIDO,
         INTACTO,
@@ -51,13 +51,17 @@ static void test_boot_chain_propagation(void) {
         INTACTO
     };
 
-    propagarCompromiso(&disp);
+    propagarCompromisoModelo(&disp);
 
     assert(disp.bootrom == COMPROMETIDO);
     assert(disp.iboot == COMPROMETIDO);
     assert(disp.kernel == COMPROMETIDO);
     assert(disp.secure_enclave == INTACTO);
     assert(disp.activation_lock == INTACTO);
+}
+
+static void test_boot_chain_model_ignores_null_device(void) {
+    propagarCompromisoModelo(NULL);
 }
 
 static void test_dfu_request_layout(void) {
@@ -144,7 +148,8 @@ static void test_activation_lock_inactive_allows_activation(void) {
 
 int main(void) {
     test_initial_device_state();
-    test_boot_chain_propagation();
+    test_boot_chain_model_propagation();
+    test_boot_chain_model_ignores_null_device();
     test_dfu_request_layout();
     test_activation_lock_rejects_null_inputs();
     test_activation_lock_rejects_invalid_empty_fields();
