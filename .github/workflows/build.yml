@@ -15,14 +15,20 @@ jobs:
       - name: Build normal target
         run: make
 
+      - name: Build strict target
+        run: make strict
+
       - name: Run normal demo
         run: make run
 
-      - name: Run smoke tests
+      - name: Run unit tests
         run: make test
 
       - name: Build and run AddressSanitizer target
         run: make asan
+
+      - name: Build and run UndefinedBehaviorSanitizer target
+        run: make ubsan
 
       - name: Clean generated files
         run: make clean
