@@ -97,6 +97,26 @@ static void test_activation_lock_rejects_invalid_empty_fields(void) {
     assert(validarActivationLockModelo(&valid_record, &empty_owner_request) == ACTIVATION_DENIED);
 }
 
+static void test_activation_lock_rejects_non_terminated_fields(void) {
+    ActivationRecord record = make_record("ECID-A11-123456", "owner@icloud.com", 1);
+    ActivationRequest request = make_request("ECID-A11-123456", "owner@icloud.com", 1);
+
+    memset(record.ecid, 'A', sizeof(record.ecid));
+    assert(validarActivationLockModelo(&record, &request) == ACTIVATION_DENIED);
+
+    record = make_record("ECID-A11-123456", "owner@icloud.com", 1);
+    memset(record.apple_id_propietario, 'B', sizeof(record.apple_id_propietario));
+    assert(validarActivationLockModelo(&record, &request) == ACTIVATION_DENIED);
+
+    record = make_record("ECID-A11-123456", "owner@icloud.com", 1);
+    memset(request.ecid, 'C', sizeof(request.ecid));
+    assert(validarActivationLockModelo(&record, &request) == ACTIVATION_DENIED);
+
+    request = make_request("ECID-A11-123456", "owner@icloud.com", 1);
+    memset(request.apple_id_presentado, 'D', sizeof(request.apple_id_presentado));
+    assert(validarActivationLockModelo(&record, &request) == ACTIVATION_DENIED);
+}
+
 static void test_activation_lock_accepts_owner_with_ticket(void) {
     ActivationRecord record = make_record("ECID-A11-123456", "owner@icloud.com", 1);
     ActivationRequest request = make_request("ECID-A11-123456", "owner@icloud.com", 1);
@@ -128,6 +148,7 @@ int main(void) {
     test_dfu_request_layout();
     test_activation_lock_rejects_null_inputs();
     test_activation_lock_rejects_invalid_empty_fields();
+    test_activation_lock_rejects_non_terminated_fields();
     test_activation_lock_accepts_owner_with_ticket();
     test_activation_lock_rejects_wrong_identity_or_ticket();
     test_activation_lock_inactive_allows_activation();
