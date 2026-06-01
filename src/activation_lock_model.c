@@ -4,18 +4,6 @@
 #include "demo.h"
 
 typedef struct {
-    char ecid[32];
-    char apple_id_propietario[64];
-    int  activation_lock_activo;
-} RegistroServidorApple;
-
-typedef struct {
-    char ecid[32];
-    char apple_id_presentado[64];
-    int  ticket_firmado_por_apple;
-} SolicitudActivacion;
-
-typedef struct {
     const char *nombre;
     const char *capa_atacada;
     const char *objetivo;
@@ -23,68 +11,87 @@ typedef struct {
     int compromete_activation_lock;
 } AnalisisVector;
 
-static int servidorAppleValidaActivacionSilencioso(
-    const RegistroServidorApple *registro,
-    const SolicitudActivacion *solicitud
-) {
-    if (strcmp(registro->ecid, solicitud->ecid) != 0) {
+static int bufferContieneTerminador(const char *value, size_t size) {
+    return memchr(value, '\0', size) != NULL;
+}
+
+static int campoTextoValido(const char *value, size_t size) {
+    if (value == NULL) {
         return 0;
     }
 
-    if (!registro->activation_lock_activo) {
-        return 1;
+    if (!bufferContieneTerminador(value, size)) {
+        return 0;
     }
 
-    return strcmp(registro->apple_id_propietario, solicitud->apple_id_presentado) == 0
-        && solicitud->ticket_firmado_por_apple;
+    if (value[0] == '\0') {
+        return 0;
+    }
+
+    return 1;
 }
 
-int validarActivationLockModelo(
-    const char *ecid_registrado,
-    const char *apple_id_propietario,
-    int activation_lock_activo,
-    const char *ecid_solicitud,
-    const char *apple_id_presentado,
-    int ticket_firmado_por_apple
+ActivationResult validarActivationLockModelo(
+    const ActivationRecord *record,
+    const ActivationRequest *request
 ) {
-    RegistroServidorApple registro;
-    SolicitudActivacion solicitud;
+    if (record == NULL || request == NULL) {
+        return ACTIVATION_DENIED;
+    }
 
-    memset(&registro, 0, sizeof(registro));
-    memset(&solicitud, 0, sizeof(solicitud));
+    if (!campoTextoValido(record->ecid, sizeof(record->ecid)) ||
+        !campoTextoValido(record->apple_id_propietario, sizeof(record->apple_id_propietario)) ||
+        !campoTextoValido(request->ecid, sizeof(request->ecid)) ||
+        !campoTextoValido(request->apple_id_presentado, sizeof(request->apple_id_presentado))) {
+        return ACTIVATION_DENIED;
+    }
 
-    strncpy(registro.ecid, ecid_registrado, sizeof(registro.ecid) - 1);
-    strncpy(registro.apple_id_propietario,
-            apple_id_propietario,
-            sizeof(registro.apple_id_propietario) - 1);
-    registro.activation_lock_activo = activation_lock_activo;
+    if (strcmp(record->ecid, request->ecid) != 0) {
+        return ACTIVATION_DENIED;
+    }
 
-    strncpy(solicitud.ecid, ecid_solicitud, sizeof(solicitud.ecid) - 1);
-    strncpy(solicitud.apple_id_presentado,
-            apple_id_presentado,
-            sizeof(solicitud.apple_id_presentado) - 1);
-    solicitud.ticket_firmado_por_apple = ticket_firmado_por_apple;
+    if (!record->activation_lock_activo) {
+        return ACTIVATION_ALLOWED;
+    }
 
-    return servidorAppleValidaActivacionSilencioso(&registro, &solicitud);
+    if (strcmp(record->apple_id_propietario, request->apple_id_presentado) == 0 &&
+        request->ticket_firmado_por_apple) {
+        return ACTIVATION_ALLOWED;
+    }
+
+    return ACTIVATION_DENIED;
 }
 
 static int servidorAppleValidaActivacion(
-    const RegistroServidorApple *registro,
-    const SolicitudActivacion *solicitud
+    const ActivationRecord *record,
+    const ActivationRequest *request
 ) {
-    if (strcmp(registro->ecid, solicitud->ecid) != 0) {
+    ActivationResult result = validarActivationLockModelo(record, request);
+
+    if (record == NULL || request == NULL) {
+        printf("  [SERVIDOR] Solicitud no valida. Activacion rechazada.\n");
+        return 0;
+    }
+
+    if (!campoTextoValido(record->ecid, sizeof(record->ecid)) ||
+        !campoTextoValido(record->apple_id_propietario, sizeof(record->apple_id_propietario)) ||
+        !campoTextoValido(request->ecid, sizeof(request->ecid)) ||
+        !campoTextoValido(request->apple_id_presentado, sizeof(request->apple_id_presentado))) {
+        printf("  [SERVIDOR] Campos de activacion vacios o mal formados. Activacion rechazada.\n");
+        return 0;
+    }
+
+    if (strcmp(record->ecid, request->ecid) != 0) {
         printf("  [SERVIDOR] ECID desconocido. Activacion rechazada.\n");
         return 0;
     }
 
-    if (!registro->activation_lock_activo) {
+    if (!record->activation_lock_activo) {
         printf("  [SERVIDOR] Activation Lock no esta activo. Activacion permitida.\n");
         return 1;
     }
 
-    if (strcmp(registro->apple_id_propietario,
-               solicitud->apple_id_presentado) == 0
-        && solicitud->ticket_firmado_por_apple) {
+    if (result == ACTIVATION_ALLOWED) {
         printf("  [SERVIDOR] Apple ID correcto y ticket valido.\n");
         printf("  [SERVIDOR] Activation Lock puede retirarse legitimamente.\n");
         return 1;
@@ -98,13 +105,13 @@ static int servidorAppleValidaActivacion(
 void demoActivationLockRemoto(const Dispositivo *disp) {
     printf("\n=== [4] ACTIVATION LOCK: VALIDACION REMOTA ===\n");
 
-    RegistroServidorApple registro = {
+    ActivationRecord registro = {
         "ECID-A11-123456",
         "propietario@icloud.com",
         1
     };
 
-    SolicitudActivacion intentoAtacante = {
+    ActivationRequest intentoAtacante = {
         "ECID-A11-123456",
         "atacante@icloud.com",
         0
@@ -139,7 +146,7 @@ void demoActivationLockRemoto(const Dispositivo *disp) {
 
     printf("\nCaso legitimo: propietario original autenticado.\n");
 
-    SolicitudActivacion solicitudPropietario = {
+    ActivationRequest solicitudPropietario = {
         "ECID-A11-123456",
         "propietario@icloud.com",
         1
