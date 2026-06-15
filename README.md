@@ -39,6 +39,18 @@ BootROM -> iBoot -> Kernel -> Userland
     \-> Secure Enclave separado
 ```
 
+El siguiente diagrama Mermaid muestra la misma idea de forma visual:
+
+```mermaid
+flowchart TD
+    A[BootROM / SecureROM] --> B[iBoot]
+    B --> C[Kernel iOS]
+    C --> D[Userland]
+    C --> F[Activation Lock Client]
+    F --> G[Activation Server]
+    A -. Dominio separado .-> E[Secure Enclave]
+```
+
 La BootROM actua como raiz de confianza. Si se compromete esta primera etapa, se rompe la confianza sobre las etapas posteriores, ya que el atacante puede alterar que componente se carga despues. Al estar la BootROM grabada en ROM dentro del SoC, un fallo en esa zona no puede corregirse completamente mediante una simple actualizacion de software en dispositivos ya fabricados.
 
 ## Lenguaje utilizado
@@ -134,8 +146,10 @@ El proyecto incluye estos objetivos:
 ```bash
 make
 make run
+make strict
 make test
 make asan
+make ubsan
 make clean
 ```
 
@@ -156,6 +170,14 @@ gcc -std=c99 -O0 -Wall -Wextra -Iinclude src/main.c src/uaf_demo.c src/bootchain
 ```bash
 make run
 ```
+
+### Compilacion estricta
+
+```bash
+make strict
+```
+
+Compila con flags mas exigentes, incluyendo `-Wpedantic`, `-Wshadow`, `-Wconversion` y `-Werror`. La advertencia de `use-after-free` no se convierte en error porque el proyecto contiene una ruta educativa intencional para demostrar ese fallo.
 
 ### Ejecutar unit tests
 
@@ -193,9 +215,17 @@ A diferencia de una ejecucion meramente informativa, `make asan` ahora verifica 
 
 1. ejecuta la ruta `--asan-trigger`;
 2. guarda la salida en `asan_output.log`;
-3. busca el patron `ERROR: AddressSanitizer: heap-use-after-free`;
+3. busca el patron `AddressSanitizer:.*heap-use-after-free`;
 4. devuelve exito solo si ese patron aparece;
 5. falla si ASan no detecta el use-after-free esperado.
+
+### Ejecutar con UndefinedBehaviorSanitizer
+
+```bash
+make ubsan
+```
+
+Compila el proyecto con `-fsanitize=undefined` y ejecuta la demo para detectar comportamiento indefinido no relacionado directamente con ASan.
 
 ### Limpiar binarios generados
 
@@ -203,7 +233,7 @@ A diferencia de una ejecucion meramente informativa, `make asan` ahora verifica 
 make clean
 ```
 
-Elimina los binarios generados por la compilacion normal, AddressSanitizer, tests y el log temporal de ASan.
+Elimina los binarios generados por la compilacion normal, compilacion estricta, AddressSanitizer, UndefinedBehaviorSanitizer, tests y el log temporal de ASan.
 
 ## Sample output
 
@@ -314,17 +344,19 @@ El repositorio incluye un workflow en:
 .github/workflows/build.yml
 ```
 
-El workflow ejecuta:
+El workflow ejecuta la misma bateria de comprobaciones con GCC y Clang mediante una matriz de compiladores:
 
 ```bash
 make
+make strict
 make run
 make test
 make asan
+make ubsan
 make clean
 ```
 
-Esto permite comprobar automaticamente que el proyecto compila, que los unit tests pasan y que la ruta educativa de AddressSanitizer detecta el use-after-free esperado.
+Esto permite comprobar automaticamente que el proyecto compila con mas de un compilador, que los unit tests pasan y que las rutas educativas de sanitizers funcionan como se espera.
 
 ## Limitaciones
 
