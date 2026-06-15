@@ -1,8 +1,13 @@
 CC ?= gcc
 CFLAGS ?= -std=c99 -O0 -Wall -Wextra -Iinclude
-STRICT_FLAGS ?= -std=c99 -O0 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Werror -Wno-error=use-after-free -Iinclude
+STRICT_FLAGS ?= -std=c99 -O0 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Werror -Iinclude
 ASAN_FLAGS ?= -std=c99 -O0 -Wall -Wextra -fsanitize=address -Iinclude
 UBSAN_FLAGS ?= -std=c99 -O0 -Wall -Wextra -fsanitize=undefined -Iinclude
+
+CC_BASENAME := $(notdir $(CC))
+ifeq ($(CC_BASENAME),gcc)
+STRICT_FLAGS += -Wno-error=use-after-free
+endif
 
 SRC := src/main.c src/uaf_demo.c src/bootchain_model.c src/activation_lock_model.c
 LIB_SRC := src/uaf_demo.c src/bootchain_model.c src/activation_lock_model.c
