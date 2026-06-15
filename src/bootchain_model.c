@@ -2,18 +2,44 @@
 
 #include "demo.h"
 
-void imprimirEstado(const Dispositivo *d) {
-    const char *etiqueta[] = { "INTACTO", "COMPROMETIDO" };
+int estadoEsValido(Estado estado) {
+    return estado == INTACTO || estado == COMPROMETIDO;
+}
 
-    printf("  BootROM .............. %s\n", etiqueta[d->bootrom]);
-    printf("  iBoot ................ %s\n", etiqueta[d->iboot]);
-    printf("  Kernel iOS ........... %s\n", etiqueta[d->kernel]);
-    printf("  Secure Enclave (SEP) . %s\n", etiqueta[d->secure_enclave]);
-    printf("  Activation Lock ...... %s\n", etiqueta[d->activation_lock]);
+const char *estadoComoTexto(Estado estado) {
+    switch (estado) {
+        case INTACTO:
+            return "INTACTO";
+        case COMPROMETIDO:
+            return "COMPROMETIDO";
+        default:
+            return "DESCONOCIDO";
+    }
+}
+
+void imprimirEstado(const Dispositivo *d) {
+    if (d == NULL) {
+        printf("  Dispositivo .......... NO DISPONIBLE\n");
+        return;
+    }
+
+    printf("  BootROM .............. %s\n", estadoComoTexto(d->bootrom));
+    printf("  iBoot ................ %s\n", estadoComoTexto(d->iboot));
+    printf("  Kernel iOS ........... %s\n", estadoComoTexto(d->kernel));
+    printf("  Secure Enclave (SEP) . %s\n", estadoComoTexto(d->secure_enclave));
+    printf("  Activation Lock ...... %s\n", estadoComoTexto(d->activation_lock));
 }
 
 void propagarCompromisoModelo(Dispositivo *disp) {
     if (disp == NULL) {
+        return;
+    }
+
+    if (!estadoEsValido(disp->bootrom) ||
+        !estadoEsValido(disp->iboot) ||
+        !estadoEsValido(disp->kernel) ||
+        !estadoEsValido(disp->secure_enclave) ||
+        !estadoEsValido(disp->activation_lock)) {
         return;
     }
 
@@ -31,6 +57,11 @@ void demoPropagacionCompromiso(Dispositivo *disp) {
         return;
     }
 
+    if (!estadoEsValido(disp->bootrom)) {
+        printf("Estado de BootROM desconocido. No se propaga el compromiso.\n");
+        return;
+    }
+
     if (disp->bootrom == COMPROMETIDO) {
         printf("BootROM comprometida -> se puede cargar iBoot modificado.\n");
         printf("iBoot comprometido   -> se puede cargar kernel modificado.\n");
@@ -38,12 +69,19 @@ void demoPropagacionCompromiso(Dispositivo *disp) {
 
     propagarCompromisoModelo(disp);
 
-    printf("Secure Enclave: dominio independiente -> permanece INTACTO.\n");
-    printf("Activation Lock: verificacion remota -> permanece INTACTO.\n");
+    printf("Secure Enclave: dominio independiente -> permanece %s.\n",
+           estadoComoTexto(disp->secure_enclave));
+    printf("Activation Lock: verificacion remota -> permanece %s.\n",
+           estadoComoTexto(disp->activation_lock));
 }
 
 void capacidadesDelAtacante(const Dispositivo *disp) {
     printf("\n=== [3] ALCANCE REAL DEL COMPROMISO ===\n");
+
+    if (disp == NULL) {
+        printf("Dispositivo no valido. No se puede evaluar el alcance.\n");
+        return;
+    }
 
     printf("Con BootROM/iBoot/Kernel comprometidos, el atacante PUEDE:\n");
     printf("  - Ejecutar codigo arbitrario en el procesador principal.\n");
