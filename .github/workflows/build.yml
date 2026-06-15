@@ -8,27 +8,35 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Show compiler version
+        run: ${{ matrix.compiler }} --version
+
       - name: Build normal target
-        run: make
+        run: make CC=${{ matrix.compiler }}
 
       - name: Build strict target
-        run: make strict
+        run: make strict CC=${{ matrix.compiler }}
 
       - name: Run normal demo
         run: make run
 
       - name: Run unit tests
-        run: make test
+        run: make test CC=${{ matrix.compiler }}
 
       - name: Build and run AddressSanitizer target
-        run: make asan
+        run: make asan CC=${{ matrix.compiler }}
 
       - name: Build and run UndefinedBehaviorSanitizer target
-        run: make ubsan
+        run: make ubsan CC=${{ matrix.compiler }}
 
       - name: Clean generated files
         run: make clean
