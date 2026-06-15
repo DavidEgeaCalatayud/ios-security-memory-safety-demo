@@ -69,7 +69,9 @@ void demoUseAfterFree(Dispositivo *disp) {
         printf("El programa vuelve a usar el puntero antiguo:\n");
 
         req->handler(req->comando);
-        disp->bootrom = COMPROMETIDO;
+        if (disp != NULL) {
+            disp->bootrom = COMPROMETIDO;
+        }
     } else {
         printf("El allocator no reutilizo la direccion en esta ejecucion.\n");
         printf("La demo puede variar segun compilador, sistema y allocator.\n");
@@ -81,7 +83,7 @@ void demoUseAfterFree(Dispositivo *disp) {
 }
 
 void demoCorregida(void) {
-    printf("\n=== [6] VERSION CORREGIDA DEL USE-AFTER-FREE ===\n");
+    printf("\n=== [7] VERSION CORREGIDA DEL USE-AFTER-FREE ===\n");
 
     DFURequest *req = malloc(sizeof(DFURequest));
     if (!req) {
