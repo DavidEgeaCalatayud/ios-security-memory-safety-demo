@@ -9,8 +9,8 @@ ifeq ($(CC_BASENAME),gcc)
 STRICT_FLAGS += -Wno-error=use-after-free
 endif
 
-SRC := src/main.c src/uaf_demo.c src/bootchain_model.c src/activation_lock_model.c
-LIB_SRC := src/uaf_demo.c src/bootchain_model.c src/activation_lock_model.c
+SRC := src/main.c src/uaf_demo.c src/bootchain_model.c src/activation_lock_model.c src/ios_internals_model.c
+LIB_SRC := src/uaf_demo.c src/bootchain_model.c src/activation_lock_model.c src/ios_internals_model.c
 TARGET := demo
 STRICT_TARGET := demo_strict
 ASAN_TARGET := demo_asan
