@@ -29,6 +29,7 @@ int main(int argc, char **argv) {
     capacidadesDelAtacante(&disp);
     demoActivationLockRemoto(&disp);
     demoVulnerabilidadesActivationLock(&disp);
+    demoIosInternalsModelo(&disp);
     demoCorregida();
 
     printf("\nConclusion general:\n");
