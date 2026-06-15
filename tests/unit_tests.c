@@ -26,6 +26,18 @@ static ActivationRequest make_request(const char *ecid, const char *apple_id, in
     return request;
 }
 
+static Dispositivo make_compromised_main_processor_device(void) {
+    Dispositivo disp = {
+        COMPROMETIDO,
+        COMPROMETIDO,
+        COMPROMETIDO,
+        INTACTO,
+        INTACTO
+    };
+
+    return disp;
+}
+
 static void test_initial_device_state(void) {
     Dispositivo disp = {
         INTACTO,
@@ -40,6 +52,15 @@ static void test_initial_device_state(void) {
     assert(disp.kernel == INTACTO);
     assert(disp.secure_enclave == INTACTO);
     assert(disp.activation_lock == INTACTO);
+}
+
+static void test_estado_helpers(void) {
+    assert(estadoEsValido(INTACTO));
+    assert(estadoEsValido(COMPROMETIDO));
+    assert(!estadoEsValido((Estado)99));
+    assert(strcmp(estadoComoTexto(INTACTO), "INTACTO") == 0);
+    assert(strcmp(estadoComoTexto(COMPROMETIDO), "COMPROMETIDO") == 0);
+    assert(strcmp(estadoComoTexto((Estado)99), "DESCONOCIDO") == 0);
 }
 
 static void test_boot_chain_model_propagation(void) {
@@ -62,6 +83,21 @@ static void test_boot_chain_model_propagation(void) {
 
 static void test_boot_chain_model_ignores_null_device(void) {
     propagarCompromisoModelo(NULL);
+}
+
+static void test_boot_chain_model_ignores_invalid_state(void) {
+    Dispositivo disp = {
+        (Estado)99,
+        INTACTO,
+        INTACTO,
+        INTACTO,
+        INTACTO
+    };
+
+    propagarCompromisoModelo(&disp);
+
+    assert(disp.iboot == INTACTO);
+    assert(disp.kernel == INTACTO);
 }
 
 static void test_dfu_request_layout(void) {
@@ -146,10 +182,44 @@ static void test_activation_lock_inactive_allows_activation(void) {
     assert(validarActivationLockModelo(&record, &request) == ACTIVATION_ALLOWED);
 }
 
+static void test_ios_internals_model_defaults_are_safe(void) {
+    IosInternalsModel model = crearModeloIosInternalsAcademico();
+
+    assert(model.bootrom_immutable);
+    assert(model.dfu_parser_exposed);
+    assert(model.boot_policy_enforces_img4);
+    assert(model.iboot_validates_kernelcache);
+    assert(model.sep_separate_processor);
+    assert(model.keybag_requires_user_secret);
+    assert(model.activation_requires_remote_authorization);
+    assert(validarCadenaArranqueIosModelo(&model) == IOS_TRUST_ALLOWED);
+}
+
+static void test_ios_internals_model_rejects_broken_boot_policy(void) {
+    IosInternalsModel model = crearModeloIosInternalsAcademico();
+
+    model.iboot_validates_kernelcache = 0;
+
+    assert(validarCadenaArranqueIosModelo(&model) == IOS_TRUST_DENIED);
+    assert(validarCadenaArranqueIosModelo(NULL) == IOS_TRUST_DENIED);
+}
+
+static void test_ios_internals_model_keeps_sep_and_activation_separate(void) {
+    IosInternalsModel model = crearModeloIosInternalsAcademico();
+    Dispositivo disp = make_compromised_main_processor_device();
+
+    assert(compromisoLocalPermiteExtraerClavesSepModelo(&model, &disp) == IOS_TRUST_DENIED);
+    assert(compromisoLocalPermiteAutorizarActivationLockModelo(&model, &disp) == IOS_TRUST_DENIED);
+    assert(compromisoLocalPermiteExtraerClavesSepModelo(NULL, &disp) == IOS_TRUST_DENIED);
+    assert(compromisoLocalPermiteAutorizarActivationLockModelo(&model, NULL) == IOS_TRUST_DENIED);
+}
+
 int main(void) {
     test_initial_device_state();
+    test_estado_helpers();
     test_boot_chain_model_propagation();
     test_boot_chain_model_ignores_null_device();
+    test_boot_chain_model_ignores_invalid_state();
     test_dfu_request_layout();
     test_activation_lock_rejects_null_inputs();
     test_activation_lock_rejects_invalid_empty_fields();
@@ -157,6 +227,9 @@ int main(void) {
     test_activation_lock_accepts_owner_with_ticket();
     test_activation_lock_rejects_wrong_identity_or_ticket();
     test_activation_lock_inactive_allows_activation();
+    test_ios_internals_model_defaults_are_safe();
+    test_ios_internals_model_rejects_broken_boot_policy();
+    test_ios_internals_model_keeps_sep_and_activation_separate();
 
     printf("All unit tests passed.\n");
     return 0;
