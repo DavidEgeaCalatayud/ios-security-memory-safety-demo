@@ -119,7 +119,9 @@ void demoActivationLockRemoto(const Dispositivo *disp) {
 
     int activation_lock_local_visible = 1;
 
-    if (disp->kernel == COMPROMETIDO) {
+    if (disp == NULL) {
+        printf("Dispositivo no valido. Se omite la simulacion de parche local.\n");
+    } else if (disp->kernel == COMPROMETIDO) {
         printf("El atacante controla el kernel local.\n");
         printf("Intenta modificar el estado local de Activation Lock...\n");
 
@@ -165,6 +167,10 @@ void demoActivationLockRemoto(const Dispositivo *disp) {
 }
 
 static void imprimirVector(const AnalisisVector *v) {
+    if (v == NULL) {
+        return;
+    }
+
     printf("\nVector: %s\n", v->nombre);
     printf("  Capa atacada: %s\n", v->capa_atacada);
     printf("  Objetivo: %s\n", v->objetivo);
@@ -216,7 +222,7 @@ void demoVulnerabilidadesActivationLock(const Dispositivo *disp) {
             "Fallo logico en servidor",
             "Infraestructura remota",
             "Explotar un error en la logica del servidor de activacion",
-            "Seria critico, pero ya no seria una vulnerabilidad local del dispositivo.",
+            "Seria critico, pero no seria una vulnerabilidad local del dispositivo.",
             1
         },
         {
@@ -230,10 +236,14 @@ void demoVulnerabilidadesActivationLock(const Dispositivo *disp) {
 
     size_t total = sizeof(vectores) / sizeof(vectores[0]);
 
-    printf("Estado local del dispositivo:\n");
-    printf("  BootROM: %s\n", disp->bootrom == COMPROMETIDO ? "COMPROMETIDO" : "INTACTO");
-    printf("  iBoot:   %s\n", disp->iboot == COMPROMETIDO ? "COMPROMETIDO" : "INTACTO");
-    printf("  Kernel:  %s\n", disp->kernel == COMPROMETIDO ? "COMPROMETIDO" : "INTACTO");
+    if (disp == NULL) {
+        printf("Estado local del dispositivo: NO DISPONIBLE\n");
+    } else {
+        printf("Estado local del dispositivo:\n");
+        printf("  BootROM: %s\n", estadoComoTexto(disp->bootrom));
+        printf("  iBoot:   %s\n", estadoComoTexto(disp->iboot));
+        printf("  Kernel:  %s\n", estadoComoTexto(disp->kernel));
+    }
 
     printf("\nAnalisis de vectores posibles:\n");
 
