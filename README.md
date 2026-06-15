@@ -16,7 +16,7 @@ Uso previsto:
 
 - explicar errores de memoria de tipo use-after-free;
 - mostrar por que una vulnerabilidad temprana en la cadena de arranque es grave;
-- diferenciar compromiso local, Secure Enclave y Activation Lock;
+- diferenciar compromiso local, Secure Enclave, keybag y Activation Lock;
 - practicar compilacion, sanitizers, tests y organizacion modular de un proyecto en C.
 
 Uso no previsto:
@@ -25,7 +25,8 @@ Uso no previsto:
 - evadir Activation Lock;
 - acceder a datos de terceros;
 - construir herramientas de jailbreak operativas;
-- saltarse mecanismos antirrobo o de autenticacion.
+- saltarse mecanismos antirrobo o de autenticacion;
+- documentar offsets, payloads, paquetes USB, cadenas ROP o procedimientos reales de explotacion.
 
 ## Contexto
 
@@ -77,7 +78,8 @@ Se ha elegido C porque permite representar de forma directa conceptos de bajo ni
 │   ├── main.c
 │   ├── uaf_demo.c
 │   ├── bootchain_model.c
-│   └── activation_lock_model.c
+│   ├── activation_lock_model.c
+│   └── ios_internals_model.c
 ├── tests/
 │   └── unit_tests.c
 ├── .github/
@@ -98,7 +100,42 @@ Se ha elegido C porque permite representar de forma directa conceptos de bajo ni
 | `src/uaf_demo.c` | Demostracion use-after-free, version corregida y ruta ASan |
 | `src/bootchain_model.c` | Modelo BootROM -> iBoot -> Kernel y alcance del compromiso |
 | `src/activation_lock_model.c` | Modelo conceptual y funcion testeable de Activation Lock |
-| `tests/unit_tests.c` | Tests reales con `assert` sobre boot chain, DFURequest y Activation Lock |
+| `src/ios_internals_model.c` | Modelo conceptual de iOS internals: BootROM, DFU, iBoot, kernelcache, SEP, keybag y activacion remota |
+| `tests/unit_tests.c` | Tests reales con `assert` sobre boot chain, DFURequest, Activation Lock e iOS internals conceptuales |
+
+## Modelo conceptual de iOS internals
+
+El modulo `src/ios_internals_model.c` anade una capa academica que modela dominios internos de iOS sin implementar detalles operativos reales.
+
+El modelo representa:
+
+- `BootROM / SecureROM`: raiz inicial de confianza del procesador principal;
+- `DFU`: superficie temprana de recuperacion antes del sistema operativo;
+- `iBoot`: etapa que valida y prepara la carga del kernel;
+- `kernelcache`: nucleo del sistema iOS;
+- `Userland`: procesos y servicios por encima del kernel;
+- `Secure Enclave`: dominio separado para operaciones sensibles;
+- `Keybag`: modelo conceptual de proteccion de claves ligada al usuario;
+- `Activation Lock`: autorizacion remota ligada a identidad y servidor.
+
+La finalidad es reforzar una idea importante: una vulnerabilidad local grave en el procesador principal no implica automaticamente control del Secure Enclave, extraccion de claves protegidas, descifrado de datos de usuario o autorizacion remota de Activation Lock.
+
+El modelo incluye funciones testeables como:
+
+```c
+IosInternalsModel crearModeloIosInternalsAcademico(void);
+IosTrustDecision validarCadenaArranqueIosModelo(const IosInternalsModel *model);
+IosTrustDecision compromisoLocalPermiteExtraerClavesSepModelo(
+    const IosInternalsModel *model,
+    const Dispositivo *disp
+);
+IosTrustDecision compromisoLocalPermiteAutorizarActivationLockModelo(
+    const IosInternalsModel *model,
+    const Dispositivo *disp
+);
+```
+
+Estas funciones son deliberadamente conceptuales. No describen offsets, formatos internos reales, blobs firmados, trafico USB, payloads, cadenas ROP, memoria de BootROM ni procedimientos practicos de explotacion.
 
 ## API de Activation Lock
 
@@ -139,6 +176,19 @@ La funcion `validarActivationLockModelo` deniega por defecto entradas no validas
 
 Esta API evita una firma excesivamente larga con muchos parametros sueltos y hace que el codigo sea mas legible, testeable y parecido a una validacion remota real.
 
+## Robustez defensiva
+
+El proyecto incluye guardas defensivas para evitar fallos innecesarios en funciones publicas que reciben punteros.
+
+Ejemplos:
+
+- `imprimirEstado(NULL)` imprime un estado no disponible en lugar de desreferenciar un puntero nulo;
+- `propagarCompromisoModelo(NULL)` retorna sin modificar nada;
+- `capacidadesDelAtacante(NULL)` informa de que no puede evaluar el alcance;
+- los estados `Estado` se convierten a texto mediante `estadoComoTexto`, que devuelve `DESCONOCIDO` si recibe un valor fuera del enum esperado.
+
+Esto evita indexar arrays con enums no validados y mejora el comportamiento del programa ante estados corruptos o mal formados.
+
 ## Makefile
 
 El proyecto incluye estos objetivos:
@@ -162,7 +212,7 @@ make
 Equivale a compilar el proyecto modular usando `gcc`:
 
 ```bash
-gcc -std=c99 -O0 -Wall -Wextra -Iinclude src/main.c src/uaf_demo.c src/bootchain_model.c src/activation_lock_model.c -o demo
+gcc -std=c99 -O0 -Wall -Wextra -Iinclude src/main.c src/uaf_demo.c src/bootchain_model.c src/activation_lock_model.c src/ios_internals_model.c -o demo
 ```
 
 ### Ejecutar
@@ -177,7 +227,7 @@ make run
 make strict
 ```
 
-Compila con flags mas exigentes, incluyendo `-Wpedantic`, `-Wshadow`, `-Wconversion` y `-Werror`. La advertencia de `use-after-free` no se convierte en error porque el proyecto contiene una ruta educativa intencional para demostrar ese fallo.
+Compila con flags mas exigentes, incluyendo `-Wpedantic`, `-Wshadow`, `-Wconversion` y `-Werror`. La advertencia de `use-after-free` no se convierte en error solo cuando el compilador es GCC, porque el proyecto contiene una ruta educativa intencional para demostrar ese fallo. Con Clang no se inyecta esa excepcion para evitar errores por flags desconocidas.
 
 ### Ejecutar unit tests
 
@@ -188,6 +238,7 @@ make test
 El test compila `tests/unit_tests.c` junto con los modulos del proyecto, excepto `src/main.c`, y valida con `assert` que:
 
 - el estado inicial del dispositivo es coherente;
+- los helpers de estado rechazan enums invalidos;
 - el compromiso de BootROM propaga correctamente hacia iBoot y Kernel;
 - Secure Enclave y Activation Lock permanecen intactos tras el compromiso local;
 - la estructura `DFURequest` mantiene los valores esperados;
@@ -196,7 +247,8 @@ El test compila `tests/unit_tests.c` junto con los modulos del proyecto, excepto
 - Activation Lock rechaza campos demasiado largos/no terminados;
 - Activation Lock rechaza identidad incorrecta o ticket ausente;
 - Activation Lock acepta al propietario con Apple ID correcto y ticket valido;
-- Activation Lock permite activacion cuando el bloqueo no esta activo.
+- Activation Lock permite activacion cuando el bloqueo no esta activo;
+- el modelo de iOS internals mantiene separados SEP, keybag y Activation Lock frente a un compromiso local del procesador principal.
 
 ### Ejecutar con AddressSanitizer
 
@@ -207,7 +259,7 @@ make asan
 El objetivo `asan` compila usando AddressSanitizer y ejecuta una ruta educativa especifica:
 
 ```bash
-gcc -std=c99 -O0 -Wall -Wextra -fsanitize=address -Iinclude src/main.c src/uaf_demo.c src/bootchain_model.c src/activation_lock_model.c -o demo_asan
+gcc -std=c99 -O0 -Wall -Wextra -fsanitize=address -Iinclude src/main.c src/uaf_demo.c src/bootchain_model.c src/activation_lock_model.c src/ios_internals_model.c -o demo_asan
 ./demo_asan --asan-trigger
 ```
 
@@ -235,42 +287,13 @@ make clean
 
 Elimina los binarios generados por la compilacion normal, compilacion estricta, AddressSanitizer, UndefinedBehaviorSanitizer, tests y el log temporal de ASan.
 
-## Sample output
-
-La ejecucion normal muestra una salida similar a esta:
-
-```text
-Estado inicial del dispositivo:
-  BootROM .............. INTACTO
-  iBoot ................ INTACTO
-  Kernel iOS ........... INTACTO
-  Secure Enclave (SEP) . INTACTO
-  Activation Lock ...... INTACTO
-
-=== [1] DEMO: use-after-free con puntero a funcion ===
-Peticion legitima creada en direccion: 0x55f...
-  [LEGITIMO] Procesando comando: DFU_UPLOAD
-Memoria liberada, pero el puntero antiguo sigue existiendo: 0x55f...
-Heap grooming simulado: bloque reutilizado en spray[0] (0x55f...)
-El programa vuelve a usar el puntero antiguo:
-  [SECUESTRADO] Flujo desviado. Mensaje: datos_controlados
-
-=== [2] PROPAGACION POR LA CADENA DE ARRANQUE ===
-BootROM comprometida -> se puede cargar iBoot modificado.
-iBoot comprometido   -> se puede cargar kernel modificado.
-Secure Enclave: dominio independiente -> permanece INTACTO.
-Activation Lock: verificacion remota -> permanece INTACTO.
-```
-
-La direccion de memoria y el indice `spray[n]` pueden variar entre ejecuciones.
-
 ## Que demuestra el codigo
 
 La demo muestra que un fallo de tipo use-after-free puede permitir que un programa vuelva a usar memoria ya liberada. Si esa memoria es reutilizada con datos controlados, el flujo de ejecucion puede desviarse.
 
 En el ejemplo, una estructura `DFURequest` contiene un puntero a funcion llamado `handler`. Primero apunta a una funcion legitima. Despues, la estructura se libera, pero el puntero antiguo se sigue usando. Si el bloque de memoria se reutiliza con una estructura controlada, el campo `handler` puede apuntar a otra funcion.
 
-Esto representa de forma didactica como una vulnerabilidad de memoria puede afectar al flujo de ejecucion. No representa el funcionamiento real de checkm8, sino una abstraccion segura del tipo de problema.
+Esto representa de forma didactica como una vulnerabilidad de memoria puede afectar al flujo de ejecucion. No representa el funcionamiento real de checkm8 ni una explotacion realista de iOS. Es una abstraccion segura para relacionar errores de memoria, cadena de confianza y dominios de seguridad.
 
 ## Relacion conceptual con checkm8
 
@@ -279,31 +302,22 @@ La relacion con checkm8 es conceptual:
 - checkm8 afecta a una etapa temprana del arranque;
 - el fallo se asocia al entorno USB DFU de la BootROM;
 - al estar en ROM, no puede parchearse completamente por software en chips ya fabricados;
-- comprometer la BootROM permite alterar la cadena de arranque local;
+- comprometer la BootROM puede alterar la cadena de arranque local;
 - este compromiso puede facilitar jailbreaks o ejecucion de codigo no firmado;
-- no equivale automaticamente a descifrar datos del usuario ni a retirar Activation Lock.
+- no equivale automaticamente a descifrar datos del usuario, controlar SEP ni retirar Activation Lock.
 
-## Secure Enclave
+## Secure Enclave, keybag y Activation Lock
 
-El codigo modela el Secure Enclave como un dominio separado.
+El codigo modela Secure Enclave, keybag y Activation Lock como dominios separados.
 
-La idea central es que comprometer el procesador principal no implica obtener automaticamente el control del Secure Enclave. En dispositivos reales, el Secure Enclave tiene su propia cadena de arranque, memoria y sistema interno.
+La idea central es que comprometer el procesador principal no implica automaticamente:
 
-Por eso, aunque un atacante consiga ejecutar codigo no autorizado en el procesador principal, no obtiene necesariamente las claves protegidas por el SEP ni puede descifrar automaticamente todos los datos del usuario.
+- obtener el control del Secure Enclave;
+- extraer claves protegidas;
+- descifrar datos protegidos por secretos del usuario;
+- generar una autorizacion remota valida de Activation Lock.
 
-## Activation Lock
-
-Activation Lock se representa como una validacion que depende de un servidor remoto y de la identidad del propietario.
-
-La demo diferencia entre:
-
-- modificar el estado local del dispositivo;
-- ocultar una pantalla o parchear una comprobacion local;
-- obtener una autorizacion remota legitima.
-
-El punto importante es que jailbreak y Activation Lock no son equivalentes. Un jailbreak puede modificar restricciones locales del sistema, pero Activation Lock depende de la asociacion entre el dispositivo, el Apple ID propietario y la infraestructura remota de activacion.
-
-Por ese motivo, el codigo no implementa ningun bypass real de Activation Lock. Solo muestra, de forma academica, por que un compromiso local no basta para generar una activacion valida.
+Activation Lock se representa como una validacion que depende de un servidor remoto y de la identidad del propietario. El codigo diferencia entre modificar el estado local del dispositivo, ocultar una pantalla o parchear una comprobacion local, y obtener una autorizacion remota legitima.
 
 ## Catalogo de vulnerabilidades analizadas
 
@@ -313,7 +327,7 @@ Por ese motivo, el codigo no implementa ningun bypass real de Activation Lock. S
 | Modificacion de servicios locales | Kernel / servicios locales | Puede alterar comportamiento local, pero no genera activacion valida |
 | Suplantacion de servidor | Comunicacion cliente-servidor | Debe fallar si se validan certificados y respuestas firmadas |
 | Replay de ticket | Protocolo de activacion | Debe fallar si el ticket esta ligado a sesion, ECID y nonces |
-| Robo de credenciales | Cuenta del usuario | Puede permitir retirada legitima, pero no es consecuencia directa de checkm8 |
+| Robo de credenciales del propietario | Cuenta del usuario | Puede permitir retirada legitima, pero no es consecuencia directa de checkm8 |
 | Fallo logico en servidor | Infraestructura remota | Seria critico, pero no seria un fallo local del dispositivo |
 | Ingenieria social | Usuario propietario | Ataque humano, no vulnerabilidad tecnica de BootROM |
 
@@ -369,7 +383,8 @@ Este proyecto tiene las siguientes limitaciones intencionadas:
 - no implementa cadenas ROP;
 - no evade Activation Lock;
 - no accede a datos reales del usuario;
-- no modifica ningun sistema operativo.
+- no modifica ningun sistema operativo;
+- no contiene informacion operacional para explotar dispositivos Apple.
 
 La finalidad es exclusivamente academica y conceptual.
 
